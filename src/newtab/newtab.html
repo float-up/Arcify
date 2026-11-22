@@ -6,11 +6,13 @@
   <title>新标签页</title>
   <script src="../shared/appearance.js"></script>
   <script src="focus-boot.js"></script>
+  <script src="wallpaper-boot.js"></script>
   <style>html { background: var(--bg, #f5f6f8); } html[data-hop] body { visibility: hidden; }</style>
   <link rel="stylesheet" href="../shared/theme.css">
   <link rel="stylesheet" href="newtab.css">
 </head>
 <body>
+<div id="wallpaper" class="wallpaper" aria-hidden="true"><div id="wallpaper-image" class="wallpaper-image"></div></div>
 <main id="spotlight" class="spotlight">
   <div class="search-card">
     <div class="search-row">
@@ -22,25 +24,40 @@
     </div>
     <ul id="results" class="results" role="listbox" aria-label="搜索结果" hidden></ul>
   </div>
-  <p class="hints" aria-hidden="true">
-    <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
-    <span><kbd>↵</kbd> 打开</span>
-    <span><kbd id="mod-key">⌘</kbd><kbd>↵</kbd> 后台新标签打开</span>
-    <span><kbd>/</kbd> 快捷词</span>
-    <span><kbd>Esc</kbd> 清除</span>
-  </p>
 </main>
 
-<button id="open-settings" class="corner-button" type="button" title="新标签页设置" aria-label="新标签页设置">
+<button id="open-settings" class="corner-button" type="button" title="设置与快捷键" aria-label="设置与快捷键">
   <svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#settings"/></svg>
 </button>
 
 <dialog id="settings" class="settings-dialog" aria-labelledby="settings-title">
   <form method="dialog" class="settings-inner" id="settings-form">
     <header class="settings-head">
-      <h2 id="settings-title">快捷词</h2>
+      <h2 id="settings-title">新标签页设置</h2>
       <button class="icon-button" value="close" aria-label="关闭"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#close"/></svg></button>
     </header>
+    <section class="settings-section" aria-labelledby="wallpaper-title">
+      <h3 id="wallpaper-title">背景图片</h3>
+      <div class="wallpaper-picker">
+        <button type="button" id="wallpaper-preview" class="wallpaper-preview" aria-label="选择背景图片">
+          <span id="wallpaper-empty" class="wallpaper-empty"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#image"/></svg>点击选择<br>或拖入图片</span>
+        </button>
+        <div class="wallpaper-controls">
+          <label class="slider-field">淡化<output id="wallpaper-dim-value"></output><input id="wallpaper-dim" type="range" min="0" max="80" step="5"></label>
+          <label class="slider-field">模糊<output id="wallpaper-blur-value"></output><input id="wallpaper-blur" type="range" min="0" max="30" step="1"></label>
+          <div class="wallpaper-buttons">
+            <button type="button" id="choose-wallpaper" class="soft-button">选择图片</button>
+            <button type="button" id="remove-wallpaper" class="text-button danger" hidden>移除背景</button>
+          </div>
+        </div>
+      </div>
+      <input id="wallpaper-file" type="file" accept="image/*" hidden>
+      <p id="wallpaper-error" class="form-error" role="alert" hidden></p>
+      <p class="settings-hint">图片只保存在本机，会自动压缩到适合屏幕的大小；动图只保留第一帧。</p>
+    </section>
+
+    <section class="settings-section" aria-labelledby="shortcuts-title">
+    <h3 id="shortcuts-title">快捷词</h3>
     <p class="settings-hint">输入 <kbd>/</kbd> 加快捷词再按空格（或 Tab），之后的关键词只在对应网站的常用网址、历史记录和书签中搜索。</p>
     <ul id="shortcut-list" class="shortcut-list"></ul>
     <fieldset id="shortcut-editor" class="shortcut-editor">
@@ -55,6 +72,26 @@
         <button type="button" id="save-shortcut" class="primary-button">添加</button>
       </div>
     </fieldset>
+    </section>
+
+    <section class="settings-section" aria-labelledby="keys-title">
+      <h3 id="keys-title">快捷键</h3>
+      <dl class="key-list">
+        <dt><kbd>↑</kbd><kbd>↓</kbd><span class="mac-only">或 <kbd>⌃N</kbd><kbd>⌃P</kbd></span></dt><dd>选择结果</dd>
+        <dt><kbd>↵</kbd></dt><dd>打开选中的结果</dd>
+        <dt><kbd class="mod">⌘</kbd><kbd>↵</kbd></dt><dd>在后台新标签页打开（也可 <kbd class="mod">⌘</kbd>+单击）</dd>
+        <dt><kbd>⇧</kbd><kbd>↵</kbd></dt><dd>不管选中哪一行，直接用默认搜索引擎搜索输入的文字；在快捷词范围内只搜该网站</dd>
+        <dt><kbd class="mod">⌘</kbd><kbd>⇧</kbd><kbd>↵</kbd></dt><dd>在后台新标签页用搜索引擎搜索</dd>
+        <dt><kbd>/</kbd> 快捷词 <kbd>空格</kbd> 或 <kbd>Tab</kbd></dt><dd>进入快捷词范围，例如 <code>/git react</code></dd>
+        <dt><kbd>⌫</kbd></dt><dd>输入框为空时退出快捷词</dd>
+        <dt><kbd>Esc</kbd></dt><dd>清除输入或退出快捷词；1.5 秒内连按两次关闭标签页</dd>
+      </dl>
+    </section>
+
+    <section class="settings-section" aria-labelledby="behavior-title">
+      <h3 id="behavior-title">其他</h3>
+      <label class="check-row"><input id="escape-close" type="checkbox"> 连按两次 Esc 关闭标签页<small>第一次清除输入，1.5 秒内再按一次关闭</small></label>
+    </section>
     <footer class="settings-foot">
       <button type="button" id="reset-shortcuts" class="text-button">恢复默认快捷词</button>
       <button type="button" id="clear-frequent" class="text-button danger">清除常用网址记录</button>

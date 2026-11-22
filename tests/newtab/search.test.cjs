@@ -134,3 +134,13 @@ test('internal and excluded pages never appear', async () => {
     frequent: { x: { url: 'chrome-extension://id/src/newtab/newtab.html', title: 'New tab', score: 5, t: NOW } } });
   assert.deepEqual(results.map(item => item.url), ['https://a.example/']);
 });
+
+test('Shift+Enter search text: the raw input, limited to the scope domain, nothing for empty input', async () => {
+  const { engineQuery, buildRows, DEFAULT_SHORTCUTS } = await load();
+  assert.equal(engineQuery('  react hooks '), 'react hooks');
+  assert.equal(engineQuery('github.com'), 'github.com', 'a typed URL is searched as text');
+  assert.equal(engineQuery('hooks', DEFAULT_SHORTCUTS[0]), 'site:github.com hooks');
+  assert.equal(engineQuery('   '), '');
+  const row = buildRows({ query: 'x y', results: [] }).rows.find(item => item.type === 'search');
+  assert.equal(row.text, engineQuery('x y'), 'the search row and Shift+Enter send the same text');
+});

@@ -1,8 +1,10 @@
 import {
   DEFAULT_SHORTCUTS, SOURCE_LABELS, buildRows, normalizeShortcuts, parseShortcutInput, rank, validateShortcut,
-  parseUrl,
+  parseUrl, engineQuery,
 } from './search.js';
 import { createRemoteQuery } from './remote-query.js';
+import { ESCAPE_WINDOW, createEscapeGuard } from './escape-guard.js';
+import * as Wallpaper from './wallpaper.js';
 
 const SPRITE = '../../assets/icons.svg';
 const SELF = chrome.runtime.getURL('src/newtab/newtab.html');
@@ -12,7 +14,9 @@ const list = document.querySelector('#results');
 const chip = document.querySelector('#scope-chip');
 const settings = document.querySelector('#settings');
 const isMac = /mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
-document.querySelector('#mod-key').textContent = isMac ? '⌘' : 'Ctrl';
+// Shortcut list in settings: ⌘ on macOS, Ctrl elsewhere; Ctrl+N/P is macOS only.
+for (const key of document.querySelectorAll('.key-list .mod')) key.textContent = isMac ? '⌘' : 'Ctrl';
+for (const extra of document.querySelectorAll('.key-list .mac-only')) extra.hidden = !isMac;
 
 // ---------- Focus ----------
 // focus-boot.js already made this a page that is allowed to take focus. These listeners
@@ -49,8 +53,10 @@ let rows = [];
 let selected = -1;
 let navigated = false; // the user moved the selection since the last keystroke
 
-const stored = await chrome.storage.local.get(['newtabShortcuts', 'newtabFrequent', 'appearance']);
+const stored = await chrome.storage.local.get(['newtabShortcuts', 'newtabFrequent', 'appearance', 'newtabEscapeClose', Wallpaper.STORAGE_KEY]);
 window.SidebarAppearance?.apply(stored.appearance);
+let escapeClose = stored.newtabEscapeClose !== false;
+const escapeGuard = createEscapeGuard();
 shortcuts = normalizeShortcuts(stored.newtabShortcuts);
 frequent = stored.newtabFrequent || {};
 setTimeout(() => warm(Object.values(frequent)), 0);
@@ -58,6 +64,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
   if (changes.appearance) window.SidebarAppearance?.apply(changes.appearance.newValue);
   if (changes.newtabShortcuts) { shortcuts = normalizeShortcuts(changes.newtabShortcuts.newValue); renderShortcutList(); }
+  if (changes.newtabEscapeClose) { escapeClose = changes.newtabEscapeClose.newValue !== false; document.querySelector('#escape-close').checked = escapeClose; }
+  if (changes[Wallpaper.STORAGE_KEY]) showWallpaper(Wallpaper.normalizeWallpaper(changes[Wallpaper.STORAGE_KEY].newValue));
   if (changes.newtabFrequent) { frequent = changes.newtabFrequent.newValue || {}; update({ background: true }); }
 });
 chrome.topSites?.get().then(sites => { topSites = sites || []; update({ background: true }); }).catch(() => {});
@@ -204,7 +212,10 @@ function rowContent(row) {
   if (sub.textContent) main.append(sub);
   const tail = document.createElement('span'); tail.className = 'tail';
   if (badge) tail.append(Object.assign(document.createElement('span'), { className: `badge ${row.source || row.type}`, textContent: badge }));
+  // The search row also shows its own shortcut, since it is often far down the list.
+  if (row.type === 'search') tail.append(Object.assign(document.createElement('kbd'), { className: 'engine-key', textContent: '⇧↵', title: 'Shift+Enter：随时用默认搜索引擎搜索' }));
   tail.append(Object.assign(document.createElement('kbd'), { className: 'enter', textContent: '↵' }));
+  tail.append(Object.assign(document.createElement('span'), { className: 'spinner', role: 'img', ariaLabel: '正在打开' }));
   return [lead, main, tail];
 }
 // Rows are reused by content, so an unchanged row (and its favicon) is not rebuilt,
@@ -253,20 +264,83 @@ async function send(message) {
   const response = await chrome.runtime.sendMessage(message);
   if (response?.error) throw new Error(response.error);
 }
+// Shift+Enter: search the typed text with the default search engine, whatever is selected.
+// A typed URL or a "/git" suggestion is searched as plain text too.
+// ---------- Opening feedback ----------
+// From the moment a choice is confirmed until the target page commits (which unloads this
+// page), show that it is opening: an indeterminate bar on the card and a spinner on the
+// chosen row. Nothing else can be triggered meanwhile. If the tab never leaves (a download,
+// a 204 response, an error) the state clears itself.
+const card = document.querySelector('.search-card');
+const OPENING_TIMEOUT = 15_000;
+let opening = null;
+function startOpening(index) {
+  stopOpening();
+  const item = index >= 0 ? list.children[index] : null;
+  item?.classList.add('opening');
+  item?.scrollIntoView({ block: 'nearest' }); // e.g. Shift+Enter: the search row is often far down
+  card.classList.add('opening');
+  card.setAttribute('aria-busy', 'true');
+  input.readOnly = true;
+  opening = { item, timer: setTimeout(() => stopOpening(), OPENING_TIMEOUT) };
+}
+function stopOpening() {
+  if (!opening) return;
+  clearTimeout(opening.timer);
+  opening.item?.classList.remove('opening');
+  card.classList.remove('opening');
+  card.removeAttribute('aria-busy');
+  input.readOnly = false;
+  opening = null;
+  focusInput({ force: true });
+}
+// Back into this page from the bfcache: it must not still look busy.
+addEventListener('pageshow', event => { if (event.persisted) stopOpening(); });
+async function navigate(message, index, newTab) {
+  if (opening) return;
+  if (newTab) {
+    try { await send({ ...message, newTab }); toast(message.type === 'newtab:search' ? '已在后台标签页搜索' : '已在后台标签页打开'); }
+    catch (error) { toast(error.message, { error: true }); }
+    return;
+  }
+  startOpening(index); // before the message: feedback is immediate
+  try { await send(message); }
+  catch (error) { stopOpening(); toast(error.message, { error: true }); }
+}
+async function searchEngine({ newTab = false } = {}) {
+  const text = engineQuery(input.value, scope);
+  if (!text) return;
+  navigate({ type: 'newtab:search', text }, rows.findIndex(row => row.type === 'search' && row.text === text), newTab);
+}
 async function activate(index, { newTab = false } = {}) {
   const row = rows[index];
-  if (!row) return;
-  try {
-    if (row.type === 'shortcut') { setScope(row.shortcut); return; }
-    if (row.type === 'search') await send({ type: 'newtab:search', text: row.text, newTab });
-    else await send({ type: 'newtab:open', url: row.url, title: row.title || '', record: row.type === 'result' || row.record === true, newTab });
-    if (newTab) toast('已在后台标签页打开');
-  } catch (error) { toast(error.message, true); }
+  if (!row || opening) return;
+  if (row.type === 'shortcut') { setScope(row.shortcut); return; }
+  const message = row.type === 'search'
+    ? { type: 'newtab:search', text: row.text }
+    : { type: 'newtab:open', url: row.url, title: row.title || '', record: row.type === 'result' || row.record === true };
+  navigate(message, index, newTab);
 }
-input.addEventListener('input', () => update());
+// Wake the service worker while the user is still typing, so Enter does not wait for it.
+let lastPing = 0;
+function wakeWorker() {
+  if (Date.now() - lastPing < 20_000) return;
+  lastPing = Date.now();
+  chrome.runtime.sendMessage({ type: 'newtab:ping' }).catch(() => {});
+}
+wakeWorker();
+// Any edit (typing, paste, IME) between the two presses cancels the pending close.
+input.addEventListener('input', () => { wakeWorker(); if (escapeGuard.armed) { escapeGuard.reset(); hideToast('escape'); } update(); });
 input.addEventListener('keydown', event => {
   // IME composition (e.g. Chinese pinyin): Enter / arrows belong to the input method.
   if (event.isComposing || event.keyCode === 229) return;
+  if (opening) {
+    // The page is about to be replaced: ignore further input. Esc only dismisses the indicator.
+    if (event.key === 'Escape') stopOpening();
+    if (!['Shift', 'Meta', 'Control', 'Alt'].includes(event.key)) event.preventDefault();
+    return;
+  }
+  if (event.key !== 'Escape' && !['Shift', 'Meta', 'Control', 'Alt'].includes(event.key) && escapeGuard.armed) { escapeGuard.reset(); hideToast('escape'); }
   const mod = isMac ? event.metaKey : event.ctrlKey;
   const move = delta => {
     event.preventDefault();
@@ -277,6 +351,7 @@ input.addEventListener('keydown', event => {
   };
   if (event.key === 'ArrowDown' || (isMac && event.ctrlKey && event.key === 'n')) move(1);
   else if (event.key === 'ArrowUp' || (isMac && event.ctrlKey && event.key === 'p')) move(-1);
+  else if (event.key === 'Enter' && event.shiftKey) { event.preventDefault(); searchEngine({ newTab: mod }); }
   else if (event.key === 'Enter') { event.preventDefault(); if (selected >= 0) activate(selected, { newTab: mod }); }
   else if (event.key === 'Tab' && !event.shiftKey && rows[selected]?.type === 'shortcut') { event.preventDefault(); setScope(rows[selected].shortcut); }
   else if (event.key === 'Tab' && !event.shiftKey && !scope) {
@@ -286,7 +361,9 @@ input.addEventListener('keydown', event => {
     if (exact) { event.preventDefault(); setScope(exact); }
   } else if (event.key === 'Escape') {
     event.preventDefault();
+    if (escapeClose && escapeGuard.press() === 'close') { hideToast('escape'); closeTab(); return; }
     if (input.value) { input.value = ''; update(); } else if (scope) setScope(null);
+    if (escapeClose) toast('再按一次 Esc 关闭标签页', { duration: ESCAPE_WINDOW, countdown: true, tag: 'escape' });
   } else if (event.key === 'Backspace' && scope && input.selectionStart === 0 && input.selectionEnd === 0) {
     event.preventDefault(); setScope(null);
   }
@@ -294,10 +371,23 @@ input.addEventListener('keydown', event => {
 chip.addEventListener('click', () => { setScope(null); focusInput({ force: true }); });
 
 let toastTimer;
-function toast(message, error = false) {
-  const el = document.querySelector('#toast');
-  el.textContent = message; el.classList.toggle('error', error); el.hidden = false;
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+const toastEl = document.querySelector('#toast');
+function toast(message, { error = false, duration = 2400, countdown = false, tag = '' } = {}) {
+  toastEl.textContent = message; toastEl.dataset.tag = tag;
+  toastEl.classList.toggle('error', error);
+  toastEl.classList.remove('countdown');
+  toastEl.style.setProperty('--countdown', `${duration}ms`);
+  toastEl.hidden = false;
+  if (countdown) { void toastEl.offsetWidth; toastEl.classList.add('countdown'); } // restart the bar
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, duration);
+}
+function hideToast(tag) {
+  if (tag && toastEl.dataset.tag !== tag) return;
+  clearTimeout(toastTimer); toastEl.hidden = true;
+}
+async function closeTab() {
+  try { await chrome.tabs.remove((await chrome.tabs.getCurrent()).id); }
+  catch { window.close(); }
 }
 
 // ---------- Settings: shortcut words ----------
@@ -368,9 +458,103 @@ document.querySelector('#clear-frequent').onclick = async () => {
 for (const field of Object.values(fields)) field.addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); saveButton.click(); }
 });
-document.querySelector('#open-settings').onclick = () => { resetEditor(); renderShortcutList(); settings.showModal(); fields.key.focus(); };
+document.querySelector('#open-settings').onclick = () => { resetEditor(); renderShortcutList(); settings.showModal(); settings.scrollTop = 0; document.querySelector('#choose-wallpaper').focus(); };
 settings.addEventListener('close', () => focusInput({ force: true }));
 settings.addEventListener('click', event => { if (event.target === settings) settings.close(); });
+
+// ---------- Settings: Esc ----------
+const escapeInput = document.querySelector('#escape-close');
+escapeInput.checked = escapeClose;
+escapeInput.addEventListener('change', () => {
+  escapeClose = escapeInput.checked;
+  if (!escapeClose) escapeGuard.reset();
+  chrome.storage.local.set({ newtabEscapeClose: escapeClose }).catch(error => toast(error.message, { error: true }));
+});
+
+// ---------- Wallpaper ----------
+const wallpaperLayer = document.querySelector('#wallpaper-image');
+const preview = document.querySelector('#wallpaper-preview');
+const dimInput = document.querySelector('#wallpaper-dim');
+const blurInput = document.querySelector('#wallpaper-blur');
+const fileInput = document.querySelector('#wallpaper-file');
+const wallpaperError = document.querySelector('#wallpaper-error');
+let wallpaper = Wallpaper.normalizeWallpaper(stored[Wallpaper.STORAGE_KEY]);
+let wallpaperUrl = '', loadedVersion = -1;
+function renderWallpaperControls() {
+  dimInput.value = wallpaper.dim; blurInput.value = wallpaper.blur;
+  document.querySelector('#wallpaper-dim-value').textContent = `${wallpaper.dim}%`;
+  document.querySelector('#wallpaper-blur-value').textContent = `${wallpaper.blur}px`;
+  dimInput.disabled = blurInput.disabled = !wallpaper.enabled;
+  document.querySelector('#remove-wallpaper').hidden = !wallpaper.enabled;
+  document.querySelector('#choose-wallpaper').textContent = wallpaper.enabled ? '更换图片' : '选择图片';
+  document.querySelector('#wallpaper-empty').hidden = wallpaper.enabled;
+  preview.classList.toggle('has-image', wallpaper.enabled);
+  preview.style.backgroundImage = wallpaper.enabled ? `url("${wallpaperUrl || wallpaper.placeholder}")` : '';
+  preview.style.setProperty('--preview-dim', `${wallpaper.dim}%`);
+}
+// Variables apply at once (they are cheap); the full image is read and decoded only when
+// it changed, then faded in over the placeholder painted by wallpaper-boot.js.
+async function showWallpaper(next) {
+  wallpaper = next;
+  Wallpaper.applyVariables(wallpaper);
+  Wallpaper.writeCache(wallpaper);
+  renderWallpaperControls();
+  if (!wallpaper.enabled) {
+    wallpaperLayer.classList.remove('loaded'); wallpaperLayer.style.backgroundImage = '';
+    if (wallpaperUrl) URL.revokeObjectURL(wallpaperUrl);
+    wallpaperUrl = ''; loadedVersion = -1;
+    return;
+  }
+  if (loadedVersion === wallpaper.version) return;
+  const version = wallpaper.version;
+  try {
+    const blob = await Wallpaper.readImage();
+    if (!blob) throw new Error('missing');
+    const url = URL.createObjectURL(blob);
+    const image = new Image(); image.src = url;
+    await image.decode();
+    if (wallpaper.version !== version || !wallpaper.enabled) { URL.revokeObjectURL(url); return; }
+    if (wallpaperUrl) URL.revokeObjectURL(wallpaperUrl);
+    wallpaperUrl = url; loadedVersion = version;
+    wallpaperLayer.style.backgroundImage = `url("${url}")`;
+    wallpaperLayer.classList.add('loaded');
+    renderWallpaperControls();
+  } catch {
+    // The image is gone (e.g. site data cleared): keep the placeholder only.
+  }
+}
+async function setWallpaperFile(file) {
+  if (!file) return;
+  wallpaperError.hidden = true;
+  preview.classList.add('busy');
+  try {
+    const { blob, placeholder } = await Wallpaper.processImage(file);
+    await Wallpaper.writeImage(blob);
+    loadedVersion = -1;
+    const next = Wallpaper.normalizeWallpaper({ ...wallpaper, enabled: true, placeholder, version: Date.now() });
+    await chrome.storage.local.set({ [Wallpaper.STORAGE_KEY]: next });
+    await showWallpaper(next);
+  } catch (error) {
+    wallpaperError.textContent = error.message; wallpaperError.hidden = false;
+  } finally { preview.classList.remove('busy'); fileInput.value = ''; }
+}
+for (const [inputEl, key] of [[dimInput, 'dim'], [blurInput, 'blur']]) {
+  inputEl.addEventListener('input', () => { wallpaper = { ...wallpaper, [key]: Number(inputEl.value) }; Wallpaper.applyVariables(wallpaper); renderWallpaperControls(); });
+  inputEl.addEventListener('change', () => chrome.storage.local.set({ [Wallpaper.STORAGE_KEY]: wallpaper }).catch(error => toast(error.message, { error: true })));
+}
+preview.onclick = () => fileInput.click();
+document.querySelector('#choose-wallpaper').onclick = () => fileInput.click();
+fileInput.onchange = () => setWallpaperFile(fileInput.files[0]);
+preview.addEventListener('dragover', event => { event.preventDefault(); preview.classList.add('dragging'); });
+preview.addEventListener('dragleave', () => preview.classList.remove('dragging'));
+preview.addEventListener('drop', event => { event.preventDefault(); preview.classList.remove('dragging'); setWallpaperFile(event.dataTransfer.files[0]); });
+document.querySelector('#remove-wallpaper').onclick = async () => {
+  const next = Wallpaper.normalizeWallpaper({ ...wallpaper, enabled: false, placeholder: '' });
+  await chrome.storage.local.set({ [Wallpaper.STORAGE_KEY]: next });
+  await showWallpaper(next);
+  Wallpaper.deleteImage().catch(() => {});
+};
+setTimeout(() => showWallpaper(wallpaper), 0);
 
 renderShortcutList();
 update();

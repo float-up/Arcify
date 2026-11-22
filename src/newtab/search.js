@@ -209,6 +209,14 @@ export function rank({ query = '', scope = null, frequent = {}, topSites = [], h
     .map(item => ({ ...item, sources: [...item.sources] }));
 }
 
+// Text sent to the default search engine for this input (also used by Shift+Enter).
+// Inside a shortcut scope the search is limited to its first domain.
+export function engineQuery(query, scope = null) {
+  const text = String(query ?? '').trim();
+  if (!text) return '';
+  return scope ? `site:${scope.domains[0]} ${text}` : text;
+}
+
 // Rows shown under the input. The row selected by default always comes first:
 // a typed URL, otherwise a strong match, otherwise the search action.
 export function buildRows({ query = '', scope = null, results = [], shortcuts = [], suggestions = null }) {
@@ -225,7 +233,7 @@ export function buildRows({ query = '', scope = null, results = [], shortcuts = 
     const target = resolveInput(text);
     action = target.url
       ? { type: 'url', url: target.url, label: `打开 ${target.url}`, record: true, typedUrl: true }
-      : { type: 'search', text: scope ? `site:${scope.domains[0]} ${text}` : text, label: `搜索「${text}」` };
+      : { type: 'search', text: engineQuery(text, scope), label: `搜索「${text}」` };
   }
   const resultRows = results.map(result => ({ type: 'result', ...result }));
   // Empty input: suggestions are listed, but Enter only opens one after ↑/↓ picks it.

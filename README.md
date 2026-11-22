@@ -34,7 +34,8 @@ Arcify takes over ⌘T / Ctrl+T. The new tab is a single centered search box:
 - Searches **frequently used sites → history → bookmarks**, in that priority, ranked by match quality and usage. Frequent sites use an ageing LFU (each open counts, scores halve every 14 days).
 - **Shortcut words**: type `/git` + Space and the rest of the query only searches github.com — frequent sites, history and bookmarks — with optional in-site search. Add your own in settings.
 - The caret is **in the search box as soon as the tab opens**, not in the address bar.
-- Keyboard first: ↑↓ to select, ↵ to open, ⌘↵ to open in a background tab, Esc to clear. IME-safe.
+- Keyboard first: ↑↓ to select, ↵ to open, ⌘↵ to open in a background tab, ⇧↵ to search with your default engine right away, Esc to clear — and Esc twice to close the tab. IME-safe.
+- Optional **background image**, painted in the first frame from a cached placeholder.
 
 → [New tab documentation (中文)](docs/newtab.md)
 

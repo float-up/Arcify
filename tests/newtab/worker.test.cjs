@@ -40,3 +40,20 @@ test('only the new tab page may send newtab messages; other modules\' messages a
   assert.match((await app.send({ type: 'newtab:open', url: 'javascript:alert(1)' }, page)).error, /无法打开/);
   assert.deepEqual(app.calls, []);
 });
+
+test('navigation starts before the visit is counted, and ping only wakes the worker', async () => {
+  const app = await setup();
+  const order = [];
+  let releaseStorage;
+  const get = chrome.storage.local.get;
+  chrome.storage.local.get = key => { order.push('storage read'); return new Promise(resolve => { releaseStorage = () => resolve(get(key)); }); };
+  const update = chrome.tabs.update;
+  chrome.tabs.update = (id, options) => { order.push('navigate'); return update(id, options); };
+  const reply = app.send({ type: 'newtab:open', url: 'https://github.com/', title: 'GitHub', record: true }, page);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(order, ['navigate', 'storage read'], 'the tab is already navigating while storage is still pending');
+  releaseStorage();
+  assert.deepEqual(await reply, { ok: true });
+  assert.equal(app.local.newtabFrequent['github.com'].count, 1, 'the visit is still counted');
+  assert.deepEqual(await app.send({ type: 'newtab:ping' }, page), { ok: true });
+});

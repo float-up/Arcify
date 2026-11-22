@@ -21,9 +21,11 @@ async function record(url, title) {
 async function open(message, tab) {
   const url = String(message.url || '');
   if (!isOpenable(url) && !/^(chrome|about|view-source):/i.test(url)) throw new Error('无法打开该地址');
-  if (message.record) await record(url, message.title);
-  if (message.newTab) await chrome.tabs.create({ url, active: false, windowId: tab.windowId, index: tab.index + 1 });
-  else await chrome.tabs.update(tab.id, { url });
+  // Navigate first: counting the visit (a storage read + write) must not delay the page.
+  const navigation = message.newTab
+    ? chrome.tabs.create({ url, active: false, windowId: tab.windowId, index: tab.index + 1 })
+    : chrome.tabs.update(tab.id, { url });
+  await Promise.all([navigation, message.record ? record(url, message.title) : null]);
 }
 async function search(message, tab) {
   const text = String(message.text || '').trim();
@@ -35,7 +37,8 @@ async function search(message, tab) {
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (typeof message?.type !== 'string' || !message.type.startsWith('newtab:')) return;
   if (!fromNewTabPage(sender)) { respond({ error: '不支持的请求来源' }); return; }
-  const handlers = { 'newtab:open': open, 'newtab:search': search };
+  // `ping` only wakes the worker, so the first Enter does not wait for it to start.
+  const handlers = { 'newtab:open': open, 'newtab:search': search, 'newtab:ping': async () => {} };
   const handler = handlers[message.type];
   if (!handler) { respond({ error: `未知操作：${message.type}` }); return; }
   handler(message, sender.tab).then(() => respond({ ok: true }), error => respond({ error: error.message }));

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pin 浮窗测试</title>
+  <style>
+    body { max-width: 680px; margin: 60px auto; padding: 0 24px; font: 16px/1.6 system-ui, sans-serif; color: #20242b; }
+    a, button { color: #315eb5; font: inherit; }
+    button { cursor: pointer; }
+    li { margin: 16px 0; }
+    code { background: #f0f1f4; padding: 2px 5px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Pin 浮窗测试</h1>
+  <p>先将本页面加入 Sidebar 的 Pin 区，在插件设置中开启“Pin 链接浮窗”，然后测试下面的链接。</p>
+  <ol>
+    <li><a href="peek-test.html?case=foreground" target="_blank" rel="noopener">前台打开新标签</a>：普通点击后，应尝试转为独立小窗口。</li>
+    <li><a href="peek-test.html?case=background" target="_blank" rel="noopener">后台打开新标签</a>：按住 <kbd>⌘</kbd> 点击（或用鼠标中键），应保留为后台标签。</li>
+    <li><button id="script-open" type="button">脚本 window.open 打开链接</button>：网站用脚本打开新标签，应直接出现浮窗，本页地址栏和标签栏不闪动。</li>
+    <li><button id="script-blank" type="button">脚本先开空白窗口再跳转</button>：插件无法提前接管，会由后台移入浮窗，可能有极短闪动。</li>
+    <li><button id="popup" type="button">打开网站自身的弹窗</button>：应保留网站创建的弹窗。</li>
+    <li><a href="peek-test.html?case=same-tab">当前标签内打开</a>：应在当前标签导航，不产生浮窗。</li>
+  </ol>
+  <p>当前测试参数：<code id="current-case"></code></p>
+  <script src="peek-test.js"></script>
+</body>
+</html>

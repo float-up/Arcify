@@ -1,0 +1,63 @@
+/* ============ Arcify design tokens (shared by the sidebar and the new tab page) ============
+   appearance.js sets --bg / --accent / --on-accent and data-tone on <html>.
+   Everything else is derived, so any background color yields a coherent palette. */
+:root {
+  color-scheme: light;
+  font: 400 var(--font-size, 14px)/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  letter-spacing: -.005em;
+  -webkit-font-smoothing: antialiased;
+  --bg: #f5f6f8;
+  --text: #262b33;
+  --accent: #3f7d5f;
+  --on-accent: #fff;
+  --surface: color-mix(in srgb, var(--bg) 30%, #fff);
+  --muted: color-mix(in srgb, var(--text) 60%, var(--bg));
+  --subtle: color-mix(in srgb, var(--text) 42%, var(--bg));
+  --hover: color-mix(in srgb, var(--text) 6%, var(--bg));
+  --pressed: color-mix(in srgb, var(--text) 10%, var(--bg));
+  --line: color-mix(in srgb, var(--text) 10%, var(--bg));
+  --line-strong: color-mix(in srgb, var(--text) 17%, var(--bg));
+  --accent-fg: color-mix(in srgb, var(--accent) 88%, var(--text));
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, var(--bg));
+  --active: color-mix(in srgb, var(--accent) 13%, var(--bg));
+  --active-hover: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  --ring: color-mix(in srgb, var(--accent) 35%, transparent);
+  --navigation: #b0650f;
+  --success: #2fa866;
+  --warning: #d99a2b;
+  --danger: #c8434f;
+  --shadow-sm: 0 1px 2px rgb(20 24 32 / .06), 0 0 0 .5px rgb(20 24 32 / .04);
+  --shadow-md: 0 4px 14px -4px rgb(20 24 32 / .16), 0 1px 3px rgb(20 24 32 / .06);
+  --shadow-lg: 0 24px 60px -12px rgb(10 14 20 / .35);
+  --radius-sm: 7px;
+  --radius: 9px;
+  --radius-lg: 13px;
+  --ease: cubic-bezier(.2, .7, .3, 1);
+  background: var(--bg);
+  color: var(--text);
+}
+:root[data-tone="dark"] {
+  color-scheme: dark;
+  --bg: #1e2024;
+  --text: #e5e7eb;
+  --accent: #8fd1ae;
+  --on-accent: #14181d;
+  --surface: color-mix(in srgb, var(--bg) 90%, #fff);
+  --muted: color-mix(in srgb, var(--text) 62%, var(--bg));
+  --subtle: color-mix(in srgb, var(--text) 45%, var(--bg));
+  --hover: color-mix(in srgb, var(--text) 8%, var(--bg));
+  --pressed: color-mix(in srgb, var(--text) 13%, var(--bg));
+  --line: color-mix(in srgb, var(--text) 11%, var(--bg));
+  --line-strong: color-mix(in srgb, var(--text) 19%, var(--bg));
+  --accent-fg: color-mix(in srgb, var(--accent) 80%, #fff);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--bg));
+  --active: color-mix(in srgb, var(--accent) 17%, var(--bg));
+  --active-hover: color-mix(in srgb, var(--accent) 23%, var(--bg));
+  --navigation: #f0b45a;
+  --success: #5fd394;
+  --warning: #f0bf5a;
+  --danger: #f07882;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / .3), 0 0 0 .5px rgb(255 255 255 / .04);
+  --shadow-md: 0 6px 18px -6px rgb(0 0 0 / .55), 0 1px 3px rgb(0 0 0 / .3);
+  --shadow-lg: 0 24px 60px -12px rgb(0 0 0 / .7);
+}

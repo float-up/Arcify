@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sidebar</title>
+  <link rel="stylesheet" href="../shared/theme.css">
+  <link rel="stylesheet" href="sidepanel.css">
+  <script src="../shared/appearance.js"></script>
+</head>
+<body>
+<main id="sidebar"><section id="pins-section">
+    <div class="section-heading">
+      <h2><svg class="ui-icon heading-icon" aria-hidden="true"><use href="../../assets/icons.svg#pin"/></svg>Pin <span id="pin-count" class="count"></span></h2>
+      <div class="section-actions">
+        <button id="open-settings" class="icon-button" title="设置" aria-label="设置">⚙</button>
+        <button id="new-folder" class="icon-button" title="新建文件夹" aria-label="新建文件夹">＋</button>
+      </div>
+    </div>
+    <div id="pins" class="list"></div>
+    <div id="pin-append-drop" class="append-drop" aria-label="添加到 Pin 末尾" hidden></div>
+  </section>
+  <section id="tabs-section">
+    <div class="section-heading">
+      <h2><svg class="ui-icon heading-icon" aria-hidden="true"><use href="../../assets/icons.svg#tabs"/></svg>Tabs <span id="tab-count" class="count"></span></h2>
+      <button id="clear-tabs" class="pill-button" title="关闭当前窗口的非激活普通标签页"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#sweep"/></svg>Clear</button>
+    </div>
+    <div id="tabs" class="list"></div>
+  </section>
+</main>
+
+<div id="settings" hidden>
+  <header class="settings-header">
+    <button id="close-settings" class="back">‹ 返回</button>
+    <h2>设置</h2>
+  </header>
+  <div class="settings-body">
+
+    <section class="setting-group" aria-labelledby="group-appearance">
+      <h3 id="group-appearance" class="group-title"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#palette"/></svg>外观</h3>
+      <div class="setting-card">
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">主题模式</span></div>
+          <div id="theme-mode" class="segmented" role="radiogroup" aria-label="主题模式">
+            <button type="button" role="radio" data-theme="system"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#monitor"/></svg>跟随系统</button>
+            <button type="button" role="radio" data-theme="light"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#sun"/></svg>浅色</button>
+            <button type="button" role="radio" data-theme="dark"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#moon"/></svg>深色</button>
+          </div>
+          <p id="theme-override-hint" class="setting-hint" hidden>正在使用自定义背景，界面明暗由背景颜色决定。</p>
+        </div>
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">背景颜色</span><output id="background-value" class="setting-value"></output></div>
+          <div id="background-swatches" class="swatches" role="radiogroup" aria-label="背景颜色"></div>
+        </div>
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">强调色</span><output id="accent-value" class="setting-value"></output></div>
+          <div id="accent-swatches" class="swatches" role="radiogroup" aria-label="强调色"></div>
+        </div>
+        <div class="setting-row">
+          <p class="setting-hint">预设背景会随主题模式切换明暗；自定义背景会根据颜色深浅自动调整文字颜色。</p>
+          <button id="reset-appearance" class="soft-button"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#reset"/></svg>恢复默认</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="setting-group" aria-labelledby="group-text">
+      <h3 id="group-text" class="group-title"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#type"/></svg>文字</h3>
+      <div class="setting-card">
+        <div class="setting-row stacked">
+          <div class="setting-text"><label for="font-size" class="setting-name">字体大小</label><output id="font-size-value" class="setting-value"></output></div>
+          <div class="range-row"><span class="range-mark small" aria-hidden="true">A</span><input id="font-size" type="range" min="11" max="18" step="1"><span class="range-mark large" aria-hidden="true">A</span></div>
+        </div>
+        <div class="setting-row">
+          <p class="setting-hint">调整侧边栏标签和文件夹的文字大小。</p>
+          <button id="reset-font" class="soft-button"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#reset"/></svg>恢复默认</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="setting-group" aria-labelledby="group-shortcut">
+      <h3 id="group-shortcut" class="group-title"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#keyboard"/></svg>快捷键</h3>
+      <div class="setting-card">
+        <div class="setting-row">
+          <div class="setting-text"><span class="setting-name">切换侧边栏</span><span class="setting-hint">在 Chrome 扩展快捷键页面修改，Mac 默认 ⌘B。</span></div>
+          <kbd id="shortcut-value">读取中…</kbd>
+        </div>
+        <div class="setting-row">
+          <button id="configure-shortcut" class="soft-button wide"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#external"/></svg>配置快捷键</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="setting-group" aria-labelledby="group-backup">
+      <h3 id="group-backup" class="group-title"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#archive"/></svg>Pin 备份</h3>
+      <div class="setting-card">
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">备份与恢复</span><span class="setting-hint">包含 Pin、文件夹层级和图标区。恢复会合并现有内容；相同文件夹路径下的相同 URL 不重复添加。</span></div>
+          <div class="button-pair">
+            <button id="export-pins" class="soft-button"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#download"/></svg>保存备份</button>
+            <button id="import-pins" class="soft-button"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#upload"/></svg>恢复备份</button>
+          </div>
+          <input id="backup-file" type="file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </section>
+
+    <section class="setting-group" aria-labelledby="group-labs">
+      <h3 id="group-labs" class="group-title"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#sparkles"/></svg>实验功能</h3>
+      <div class="setting-card">
+        <label class="setting-row toggle-row" for="peek-enabled">
+          <span class="setting-text"><span class="setting-name">Pin 链接浮窗</span><span class="setting-hint">Pin 页面中前台打开的新链接直接在独立浮窗中打开，当前页面不跳转；后台标签和网站自己的弹窗保持原样。</span></span>
+          <input id="peek-enabled" class="switch" type="checkbox" role="switch">
+        </label>
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">浮窗尺寸</span><output id="peek-size-value" class="setting-value"></output><span class="setting-hint">按当前浏览器窗口的宽、高比例计算，居中显示；之后新打开的浮窗生效。</span></div>
+          <div class="peek-size">
+            <div id="peek-preview" class="peek-preview" aria-hidden="true"><div id="peek-preview-window" class="peek-preview-window"></div></div>
+            <div class="peek-sliders">
+              <label class="slider-line" for="peek-width"><span>宽</span><input id="peek-width" type="range" min="30" max="100" step="5" aria-label="浮窗宽度比例"></label>
+              <label class="slider-line" for="peek-height"><span>高</span><input id="peek-height" type="range" min="30" max="100" step="5" aria-label="浮窗高度比例"></label>
+            </div>
+          </div>
+          <div id="peek-size-presets" class="chip-row" role="group" aria-label="浮窗尺寸预设">
+            <button type="button" class="chip" data-width="60" data-height="70">紧凑</button>
+            <button type="button" class="chip" data-width="80" data-height="85">标准</button>
+            <button type="button" class="chip" data-width="95" data-height="95">宽大</button>
+          </div>
+        </div>
+        <div class="setting-row stacked">
+          <div class="setting-text"><span class="setting-name">浮窗地址栏</span><span class="setting-hint">浮窗顶部显示可编辑的地址栏，平时收起为域名小标签，鼠标移上或按快捷键时展开。输入网址回车打开，输入其他文字则用默认搜索引擎搜索。以下快捷键仅在浮窗中生效，网页自身占用的按键优先。</span></div>
+          <dl id="peek-shortcuts" class="shortcut-list"></dl>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<dialog id="text-dialog" class="app-dialog"><form id="text-dialog-form">
+  <div class="dialog-heading"><div class="dialog-mark"><svg class="ui-icon" aria-hidden="true"><use href="../../assets/icons.svg#edit"/></svg></div><div><h2 id="text-dialog-title"></h2><p id="text-dialog-description"></p></div></div>
+  <label id="text-dialog-label" for="text-dialog-input"></label>
+  <input id="text-dialog-input" type="text" maxlength="120" autocomplete="off">
+  <p id="text-dialog-error" class="dialog-error" role="alert" hidden></p>
+  <div class="dialog-actions"><button id="text-dialog-cancel" type="button">取消</button><button id="text-dialog-confirm" type="submit">保存</button></div>
+</form></dialog>
+<div id="context-menu" class="context-menu" role="menu" aria-label="操作" hidden></div>
+<div id="error" role="alert"></div>
+<script type="module" src="sidepanel.js"></script>
+</body>
+</html>

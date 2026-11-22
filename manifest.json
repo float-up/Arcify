@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "Arcify",
+  "version": "0.2.0",
+  "description": "把 Arc 浏览器的体验带到 Chrome：Arc 风格侧边栏与 Spotlight 新标签页",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "sidePanel",
+    "tabs",
+    "storage",
+    "webNavigation",
+    "scripting",
+    "clipboardWrite",
+    "search",
+    "favicon",
+    "history",
+    "bookmarks",
+    "topSites"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidebar/sidepanel.html"
+  },
+  "chrome_url_overrides": {
+    "newtab": "src/newtab/newtab.html"
+  },
+  "action": {
+    "default_title": "切换 Arcify 侧边栏",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png"
+    }
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+B",
+        "mac": "Command+B"
+      }
+    },
+    "copy-peek-url": {
+      "description": "复制当前悬浮窗口链接",
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "Command+Shift+L"
+      }
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  }
+}
